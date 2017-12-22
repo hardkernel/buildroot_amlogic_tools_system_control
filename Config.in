@@ -1,5 +1,6 @@
-config BR2_PACKAGE_AML_SYSTEMCONTROL
+config BR2_PACKAGE_SYSTEM_CONTROL
     bool "aml system control"
+    default y
     depends on BR2_LINUX_KERNEL
     help
         system control
