@@ -81,10 +81,16 @@ void FormatColorDepth::getHdmiColorAttribute(const char* outputmode, char* color
     mSysWrite.readSysfs(SYSFS_DISPLAY_MODE, curMode);
 
     // if only change deepcolor in MoreSettings, getcolorAttr from ubootenv, it was set in DroidTvSettings
-    if ((state == OUTPUT_MODE_STATE_SWITCH) && (!strcmp(curMode, outputmode))) {
-        //note: "outputmode" should be the second parameter of "strcmp", because it maybe prefix of "curMode".
+    if ((state == OUTPUT_MODE_STATE_SWITCH) && (!strcmp(curMode, outputmode)) && getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0) || (state == OUTPUT_MODE_STATE_POWER)) {
+            //note: "outputmode" should be the second parameter of "strcmp", because it maybe prefix of "curMode".
         syslog(LOG_INFO, "FormatColorDepth::getHdmiColorAttribute: Only modify deep color mode, get colorAttr from ubootenv.var.colorattribute\n");
         getBootEnv(UBOOTENV_COLORATTRIBUTE, colorAttribute);
+        if (isModeSupportDeepColorAttr(outputmode, colorAttribute)) {
+            syslog(LOG_INFO, "FormatColorDepth::getHdmiColorAttribute: current outputmode support deepcolor(%s)\n", colorAttribute);
+        } else {
+	    syslog(LOG_ERR, "FormatColorDepth::getHdmiColorAttribute: current outputmode(%s) not support deepcolor(%s), set the best deepcolor\n", outputmode, colorAttribute);
+	    getProperHdmiColorArrtibute(outputmode,  colorAttribute);
+        }
     } else {
         getProperHdmiColorArrtibute(outputmode,  colorAttribute);
     }
@@ -100,14 +106,14 @@ void FormatColorDepth::getProperHdmiColorArrtibute(const char* outputmode, char*
     // if auto switch best mode is off, get priority color value of mode in ubootenv,
     // and judge current mode whether this colorValue is supported in This TV device.
     // if not support or auto switch best mode is on, select color value from Lists in next step.
-    if (getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0)) {
+   /* if (getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0)) {
         syslog(LOG_INFO, "FormatColorDepth::getProperHdmiColorAttribute: get color attr from ubootenv.var.%s_deepcolor When is not best mode\n", outputmode);
         sprintf(ubootvar, "ubootenv.var.%s_deepcolor", outputmode);
         if (getBootEnv(ubootvar, tmpValue) && strstr(tmpValue, "bit") && isModeSupportDeepColorAttr(outputmode, tmpValue)) {
             strcpy(colorAttribute, tmpValue);
             return;
         }
-    }
+    }*/
 
     getBestHdmiDeepColorAttr(outputmode, colorAttribute);
 

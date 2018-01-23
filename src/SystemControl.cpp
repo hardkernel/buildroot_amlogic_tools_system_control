@@ -42,6 +42,11 @@ int SystemControl::setBootEnv(const char *key, const char *value) {
 }
 
 void SystemControl::setTvOutputMode(const char* mode) {
+    if (!strcmp(mode, "auto")) {
+        setBootEnv(UBOOTENV_ISBESTMODE, "true");
+    } else {
+        setBootEnv(UBOOTENV_ISBESTMODE, "false");
+    }
     pDisplayMode->setSourceOutputMode(mode);
 }
 

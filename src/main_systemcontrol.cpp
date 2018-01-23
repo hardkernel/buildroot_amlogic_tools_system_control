@@ -31,14 +31,21 @@ static void strsplit(char cmd[128], char* value1, char* value2, char* value3)
     for (int i = 0; i < 126; i++) {
         len++;
         char* temp = (char *)calloc(128, sizeof(char));
+        char* temp1 = (char *)calloc(128, sizeof(char));
 
         memcpy(temp, &cmd[i], 2);
+        memcpy(temp1, &cmd[i], 4);
         char target[] = "hz";
+        char autoTarget[] = "auto";
         if (strcmp(temp,target) == 0) {
             len++;
             break;
+        } else if (strcmp(temp1, autoTarget) == 0) {
+            len += 3;
+            break;
         }
         free(temp);
+        free(temp1);
     }
 
     memcpy(value1, &cmd[start], len);
@@ -47,13 +54,20 @@ static void strsplit(char cmd[128], char* value1, char* value2, char* value3)
     for (int i = start; i < 126; i++) {
         len++;
         char* temp = (char *)calloc(128, sizeof(char));
+        char* temp1 = (char *)calloc(128, sizeof(char));
         memcpy(temp, &cmd[i], 3);
+        memcpy(temp1, &cmd[i], 4);
         char target[] = "bit";
+        char autoTarget[] = "auto";
         if (strcmp(temp,target) == 0) {
             len += 2;
             break;
+        } else if (strcmp(temp1, autoTarget) == 0) {
+            len += 3;
+            break;
         }
         free(temp);
+        free(temp1);
     }
 
     memcpy(value2, &cmd[start], len);
@@ -149,6 +163,7 @@ int main(int argc, char **argv) {
                 char* hdcpmode = (char *)calloc(128, sizeof(char));
                 strsplit(cmd, displaymode, colormode, hdcpmode);
                 syslog(LOG_CRIT, "system control service displaymode(%s) colormode(%s) hdcpmode(%s)", displaymode, colormode, hdcpmode);
+                pSystemControl->setBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
                 pSystemControl->setTvColorFormat(colormode);
                 pSystemControl->setTvOutputMode(displaymode);
                 pSystemControl->setTvHdcpMode(hdcpmode);

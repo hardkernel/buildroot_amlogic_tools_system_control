@@ -27,6 +27,7 @@ public:
     bool readSysfsOriginal(const char *path, char *value);
     bool writeSysfs(const char *path, const char *value);
     bool writeSysfs(const char *path, const char *value, const int size);
+    void executeCMD(const char *cmd, char *result);
 private:
     void writeSys(const char *path, const char *val);
     int writeSys(const char *path, const char *val, const int size);

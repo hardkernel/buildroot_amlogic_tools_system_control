@@ -83,7 +83,10 @@ void DisplayMode::init() {
     pTxAuth = new HDCPTxAuth();
     pTxAuth->setUEventCallback(this);
     pTxAuth->setFRAutoAdpt(pFrameRateAutoAdaption);
+    pTxAuth->stop();
     setSourceDisplay(OUTPUT_MODE_STATE_INIT);
+    setSourceHdcpMode(DISPLAY_HDMI_HDCP_INIT, OUTPUT_MODE_STATE_INIT);
+    dumpCaps();
 }
 
 int DisplayMode::parseConfigFile(){
@@ -116,11 +119,16 @@ int DisplayMode::parseConfigFile(){
 
 void DisplayMode::onTxEvent(char *hpdState, int outputState) {
     syslog(LOG_INFO, "DisplayMode onTxEvent hpdState(%s) state(%d)\n", hpdState, outputState);
+    char hdcpmode[MODE_LEN] = {0};
+    getBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
+    syslog(LOG_INFO, "DisplayMode onTxEvent hdcpmode: %s\n", hdcpmode);
 
     if (hpdState && hpdState[0] == '1')
         dumpCaps();
 
+    pTxAuth->stop();
     setSourceDisplay((output_mode_state)outputState);
+    setSourceHdcpMode(hdcpmode, (output_mode_state)outputState);
 }
 
 void DisplayMode::dumpCap(const char * path, const char * hint, char *result) {
@@ -218,6 +226,9 @@ void DisplayMode::getHighestHdmiMode(char* mode, hdmi_data_t* data) {
     while (strlen(startpos) > 0) {
         //get edid resolution to tempMode in order.
         destpos = strstr(startpos, "\n");
+        if (NULL == destpos) {
+            break;
+        }
         memset(tempMode, 0, MODE_LEN);
         strncpy(tempMode, startpos, destpos - startpos);
         startpos = destpos + 1;
@@ -356,6 +367,7 @@ void DisplayMode::setSourceDisplay(output_mode_state state) {
             pSysWrite->writeSysfs(DISPLAY_FB1_FREESCALE, "0");
         }
     }
+
     setSourceOutputMode(outputmode, state);
 }
 
@@ -379,19 +391,60 @@ void DisplayMode::setSourceColorFormat(const char* colormode) {
 }
 
 void DisplayMode::setSourceHdcpMode(const char* hdcpmode) {
-    //stop hdcp_tx
-    pTxAuth->stopVerAll();
-    char auth[MODE_LEN] = {0};
+    setSourceHdcpMode(hdcpmode, OUTPUT_MODE_STATE_SWITCH);
+}
 
-    if (!strcmp(hdcpmode, "1")) {
-        pTxAuth->startVer14();
-    } else if (!strcmp(hdcpmode, "2")) {
-        pTxAuth->startVer22();
+void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state state) {
+    char registerValue[1024] = {0};
+    char outputmode[MODE_LEN] = {0};
+    char saveHdcpRxVer[MODE_LEN] = {0};
+    char curHdcpRxVer[MODE_LEN] = {0};
+    getBootEnv(UBOOTENV_OUTPUTMODE, outputmode);
+    setBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
+    getBootEnv(UBOOTENV_HDCPRXVER, saveHdcpRxVer);
+    pSysWrite->readSysfs(DISPLAY_HDMI_HDCP_VER, curHdcpRxVer);
+    syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode hdcpmode:%s, outputmode:%s\n", hdcpmode, outputmode);
+
+    if (OUTPUT_MODE_STATE_INIT == state) {
+        if (strstr(outputmode, "cvbs") == NULL) {
+            pTxAuth->start();
+	}
+    } else {
+	if (strstr(outputmode, "cvbs") == NULL) {
+            if (!strcmp(hdcpmode, "0")) {
+                pTxAuth->stop();
+            } else if (!strcmp(hdcpmode, "1") || !strcmp(hdcpmode, "14")) {
+		//when hotplug from 1080pTV to 4KTV, the hdcp1.4 can switch hdcp2.2
+		if ((strstr(curHdcpRxVer, (char *)"22") != NULL) && (!strcmp(saveHdcpRxVer, "14"))) {
+		    pTxAuth->start();
+		    setBootEnv(UBOOTENV_HDCPRXVER, "22");
+		} else {
+                    pTxAuth->stopVerAll();
+                    pTxAuth->startVer14();
+                    isHDCPTxAuthSuccess();
+		}
+            } else if (!strcmp(hdcpmode, "2") || !strcmp(hdcpmode, "22") || !strcmp(hdcpmode, "auto")) {
+		if (OUTPUT_MODE_STATE_SWITCH == state) {
+		    pTxAuth->stop();
+		    pTxAuth->start();
+		} else if (OUTPUT_MODE_STATE_POWER == state) {
+		    pTxAuth->start();
+		}
+            }
+            pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
+            //when play video,hotplug close fb0
+            pSysWrite->executeCMD("cat sys/class/vfm/map|awk '/decoder.*?amvideo/{print $0}'", registerValue);
+            syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode registerValue:%s\n", registerValue);
+            if (strstr(registerValue, "decoder(1)") && strstr(registerValue, "amvideo")) {
+                pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "1");
+            } else {
+                pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
+                pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
+                setOsdMouse(outputmode);
+            }
+            pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "-1");
+        }
     }
-    pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_ENABLE);
-    pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
-    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
-    pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "-1");
 }
 
 void DisplayMode::setSourceOutputMode(const char* outputmode){
@@ -423,11 +476,26 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
             char saveColorAttribute[MODE_LEN] = {0};
             pSysWrite->readSysfs(DISPLAY_HDMI_COLOR_ATTR, curColorAttribute);
             getBootEnv(UBOOTENV_COLORATTRIBUTE, saveColorAttribute);
+            if (isBestOutputmode() || !strcmp(saveColorAttribute, "auto")) {
+	        FormatColorDepth deepColor;
+		deepColor.getBestHdmiDeepColorAttr(outputmode, saveColorAttribute);
+		setBootEnv(UBOOTENV_COLORATTRIBUTE, saveColorAttribute);
+            }
             syslog(LOG_INFO, "DisplayMode curColorAttribute:[%s] ,saveColorAttribute: [%s]\n", curColorAttribute, saveColorAttribute);
-            if (NULL != strstr(curColorAttribute, saveColorAttribute))
-                return;
-        }
+            if (NULL != strstr(curColorAttribute, saveColorAttribute)) {
+		//check the hdcp same or not
+	        char curHdcpAttribute[MODE_LEN] = {0};
+		char saveHdcpAttribute[MODE_LEN] = {0};
+		pSysWrite->readSysfs(DISPLAY_HDMI_HDCP_MODE, curHdcpAttribute);
+		getBootEnv(UBOOTENV_HDCPMODE, saveHdcpAttribute);
+		syslog(LOG_INFO, "DisplayMode curHdcpAttribute:[%s] ,saveHdcpAttribute: [%s]\n", curHdcpAttribute, saveHdcpAttribute);
+		if (NULL != strstr(curHdcpAttribute, saveHdcpAttribute)) {
+                    return;
+		}
+            }
+	}
     }
+
     // 1.set avmute and close phy
     if (OUTPUT_MODE_STATE_INIT != state) {
         pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "1");
@@ -439,9 +507,6 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
             usleep(50000);//50ms
         }
     }
-
-    // 2.stop hdcp tx
-    pTxAuth->stop();
 
     if (!strcmp(outputmode, MODE_480CVBS) || !strcmp(outputmode, MODE_576CVBS)) {
         cvbsMode = true;
@@ -472,16 +537,6 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
         pSysWrite->writeSysfs(DISPLAY_HDMI_AUDIO_MUTE, "0");
         pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "-1");
     }
-
-    //5. start HDMI HDCP authenticate
-    if (!cvbsMode) {
-        pTxAuth->start();
-    }
-
-    pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_ENABLE);
-    pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
-    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
-    setOsdMouse(outputmode);
 
     //audio
     memset(value, 0, sizeof(0));
@@ -537,6 +592,18 @@ void DisplayMode::updateDeepColor(bool cvbsMode, output_mode_state state, const 
     //save to ubootenv
     saveDeepColorAttr(outputmode, colorAttribute);
     setBootEnv(UBOOTENV_COLORATTRIBUTE, colorAttribute);
+}
+
+
+bool DisplayMode::isHDCPTxAuthSuccess() {
+    bool success = false;
+    char auth[MODE_LEN] = {0};
+    pSysWrite->readSysfs(DISPLAY_HDMI_HDCP_AUTH, auth);
+    if (strstr(auth, (char *)"1")) {
+        success = true;
+    }
+    syslog(LOG_INFO, "DisplayMode::isHDCPTxAuthSuccess hdcp_tx authenticate success: %d\n", success?1:0);
+    return success;
 }
 
 void DisplayMode::updateFreeScaleAxis() {

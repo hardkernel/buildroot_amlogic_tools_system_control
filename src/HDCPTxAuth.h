@@ -28,6 +28,8 @@ public:
     void startVer14();
 
 private:
+    bool getBootEnv(const char *key, char *value);
+    void setBootEnv(const char *key, const char *value);
     bool authInit(bool *pHdcp22, bool *pHdcp14);
     bool authLoop(bool useHdcp22, bool useHdcp14);
     void stopVer22();
@@ -42,9 +44,9 @@ private:
     SysWrite mSysWrite;
     int mRepeaterRxVer;
     bool mMute;
+
     pthread_mutex_t mTxMutex;
     pthread_t pthreadIdHdcpTx;
-    pthread_t pidTx;
     bool mExitHdcpTxThread;
 };
 

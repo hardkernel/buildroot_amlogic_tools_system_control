@@ -44,6 +44,7 @@
 #define DISPLAY_HDMI_HDCP22_STOP        "stop22" //stop HDCP2.2 authenticate
 #define DISPLAY_HDMI_HDCP_14            "1"
 #define DISPLAY_HDMI_HDCP_22            "2"
+#define DISPLAY_HDMI_HDCP_INIT          "3"
 #define DISPLAY_HDMI_HDCP_VER           "/sys/class/amhdmitx/amhdmitx0/hdcp_ver"//RX support HDCP version
 #define DISPLAY_HDMI_HDCP_AUTH          "/sys/module/hdmitx20/parameters/hdmi_authenticated"//HDCP Authentication
 #define DISPLAY_HDMI_HDCP_CONF          "/sys/class/amhdmitx/amhdmitx0/hdcp_ctrl" //HDCP config
@@ -75,10 +76,10 @@
 #define HDMI_RX_AUTH_HDCP14             "1"
 #define HDMI_RX_AUTH_HDCP22             "2"
 
-#define HDMI_UEVENT_HDCP                "hdmitx_excton_hdcp"
+#define HDMI_UEVENT_HDCP                "hdmitx_extcon_hdcp"
 #define HDMI_UEVENT_HDMI                "hdmitx_extcon_hdmi"
-#define HDMI_UEVENT_HDMI_POWER          "hdmitx_excton_power"
-#define HDMI_UEVENT_HDMI_AUDIO          "hdmitx_excton_audio"
+#define HDMI_UEVENT_HDMI_POWER          "hdmitx_extcon_power"
+#define HDMI_UEVENT_HDMI_AUDIO          "hdmitx_extcon_audio"
 
 #define H265_DOUBLE_WRITE_MODE          "/sys/module/vh265/parameters/double_write_mode"
 
@@ -144,7 +145,9 @@
 #define SDR_MODE_AUTO                   "2"
 
 #define UBOOTENV_DIGITAUDIO             "ubootenv.var.digitaudiooutput"
+#define UBOOTENV_HDCPRXVER              "ubootenv.var.hdcprxver"
 #define UBOOTENV_HDMIMODE               "ubootenv.var.hdmimode"
+#define UBOOTENV_HDCPMODE               "ubootenv.var.hdcpmode"
 #define UBOOTENV_TESTMODE               "ubootenv.var.testmode"
 #define UBOOTENV_CVBSMODE               "ubootenv.var.cvbsmode"
 #define UBOOTENV_OUTPUTMODE             "ubootenv.var.outputmode"
@@ -227,6 +230,7 @@ public:
     int64_t resolveResolutionValue(const char *mode);
     void setSourceColorFormat(const char* colormode);
     void setSourceHdcpMode(const char* hdcpmode);
+    void setSourceHdcpMode(const char* hdcpmode, output_mode_state state);
     void setSourceOutputMode(const char* outputmode);
     void setSourceOutputMode(const char* outputmode, output_mode_state state);
     void setSourceDisplay(output_mode_state state);
@@ -235,6 +239,7 @@ public:
     void setOsdMouse(const char* curMode);
     void setOsdMouse(int x, int y, int w, int h);
     void getPosition(const char* curMode, int *position);
+    bool isHDCPTxAuthSuccess();
 private:
     bool getBootEnv(const char *key, char *value);
     void setBootEnv(const char *key, const char *value);

@@ -10,6 +10,7 @@
 #include "UEventObserver.h"
 #include "DisplayMode.h"
 #include "HDCPTxAuth.h"
+#include "ubootenv.h"
 
 #define LOG_TAG "systemcontrol"
 
@@ -43,6 +44,21 @@ void HDCPTxAuth::setRepeaterRxVersion(int ver) {
 void HDCPTxAuth::setUEventCallback(TxUEventCallback *cb) {
     syslog(LOG_INFO, "HDCPTxAuth setUEventCallback");
     mUEventCallback = cb;
+}
+bool HDCPTxAuth::getBootEnv(const char* key, char* value) {
+    syslog(LOG_INFO, "HDCPTxAuth::getBootEnv");
+    const char* val = bootenv_get(key);
+
+    if (val) {
+        strcpy(value, val);
+        return true;
+    }
+    return false;
+}
+
+void HDCPTxAuth::setBootEnv(const char* key, const char* value) {
+    syslog(LOG_INFO, "HDCPTxAuth::setBootEnv");
+    bootenv_update(key, value);
 }
 
 void HDCPTxAuth::setFRAutoAdpt(FrameRateAutoAdaption *mFRAutoAdpt) {
@@ -118,7 +134,7 @@ void HDCPTxAuth::mute(bool mute) {
 }
 
 void HDCPTxAuth::stopVer22() {
-    syslog(LOG_INFO, "HDCPTxAuth stopVer22 childPid %d\n", pidTx);
+    syslog(LOG_INFO, "HDCPTxAuth stopVer22\n");
     int status;
     status = system("hdcpcontrol.sh stop");
     if (status < 0) {
@@ -151,18 +167,15 @@ void* HDCPTxAuth::authThread(void* data) {
     sem_post(&pThiz->pthreadTxSem);
 
     if (pThiz->authInit(&hdcp22, &hdcp14)) {
-        //first close osd, after HDCP authenticate completely, then open osd
-        pThiz->mSysWrite.writeSysfs(DISPLAY_FB0_BLANK, "1");
         if (!pThiz->authLoop(hdcp22, hdcp14)) {
             syslog(LOG_ERR, "HDCPTxAuth HDCP authenticate fail,need black screen and disable audio\n");
             pThiz->mSysWrite.writeSysfs(AV_HDMI_CONFIG, "audio_off");
             return NULL;
         }
-        pThiz->mSysWrite.writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_ENABLE);
-        pThiz->mSysWrite.writeSysfs(DISPLAY_FB0_BLANK, "0");
+        pThiz->mSysWrite.writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
         pThiz->mSysWrite.writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
     } else {
-        pThiz->mSysWrite.writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_ENABLE);
+        pThiz->mSysWrite.writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
     }
     return NULL;
 }
@@ -259,6 +272,16 @@ bool HDCPTxAuth::authLoop(bool useHdcp22, bool useHdcp14) {
             break;
         }
     }
+
+    char hdcpmode[MODE_LEN] = {0};
+    char hdcpRxVer[MODE_LEN] = {0};
+    mSysWrite.readSysfs(DISPLAY_HDMI_HDCP_MODE, hdcpmode);
+    mSysWrite.readSysfs(DISPLAY_HDMI_HDCP_VER, hdcpRxVer);
+    setBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
+    //if TV only support hdcp1.4
+    if ((strstr(hdcpRxVer, (char *)"22") == NULL) && (strstr(hdcpRxVer, (char *)"14") != NULL)) {
+        setBootEnv(UBOOTENV_HDCPRXVER, "14");
+    }
     syslog(LOG_INFO, "HDCPTxAuth hdcp_tx authenticate success: %d\n", success?1:0);
     return success;
 }
@@ -274,12 +297,14 @@ void HDCPTxAuth::startVer22() {
     if (status < 0) {
         syslog(LOG_ERR, "HDCPTxAuth startVer22: start hdcp_tx 2.2 failed:%s\n", strerror(errno));
     }
+    usleep(2*1000*1000);
 }
 
 void HDCPTxAuth::startVer14() {
     //start hdcp_tx 1.4
     syslog(LOG_INFO, "HDCPTxAuth startVer14: start hdcp_tx 1.4\n");
     mSysWrite.writeSysfs(DISPLAY_HDMI_HDCP_MODE, DISPLAY_HDMI_HDCP_14);
+    usleep(1*1000*1000);
 }
 
 void *HDCPTxAuth::TxUEventThread(void *data) {
@@ -299,17 +324,15 @@ void *HDCPTxAuth::TxUEventThread(void *data) {
 
         if (!strcmp(ueventData.matchName, HDMI_TX_PLUG_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDMI) && (NULL != pThiz->mUEventCallback)) {
             pThiz->mUEventCallback->onTxEvent(ueventData.switchState, OUTPUT_MODE_STATE_POWER);
-        }
-        else if (!strcmp(ueventData.matchName, HDMI_TX_POWER_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDMI_POWER)) {
-             //0: hdmi suspend  1: hdmi resume
-             if (!strcmp(ueventData.switchState, HDMI_TX_RESUME) && (NULL != pThiz->mUEventCallback)) {
-                    pThiz->mUEventCallback->onTxEvent(ueventData.switchState, OUTPUT_MODE_STATE_POWER);
-             }
-             else if (!strcmp(ueventData.switchState, HDMI_TX_SUSPEND)) {
-                 pThiz->mSysWrite.writeSysfs(DISPLAY_HDMI_HDCP_POWER, "1");
-             }
-        }
-        else if (!strcmp(ueventData.matchName, HDMI_TX_HDCP_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDCP)) {
+        } else if (!strcmp(ueventData.matchName, HDMI_TX_POWER_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDMI_POWER)) {
+            //0: hdmi suspend  1: hdmi resume
+            if (!strcmp(ueventData.switchState, HDMI_TX_RESUME) && (NULL != pThiz->mUEventCallback)) {
+                pThiz->mUEventCallback->onTxEvent(ueventData.switchState, OUTPUT_MODE_STATE_POWER);
+            } else if (!strcmp(ueventData.switchState, HDMI_TX_SUSPEND)) {
+                syslog(LOG_INFO, "HDCP switchState = HDMI_TX_SUSUPEND\n");
+                pThiz->mSysWrite.writeSysfs(DISPLAY_HDMI_HDCP_POWER, "1");
+            }
+        } else if (!strcmp(ueventData.matchName, HDMI_TX_HDCP_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDCP)) {
             //0: hdcp failure -> mute a/v
             if (!strcmp(ueventData.switchState, "0"))
                 pThiz->mute(true);
