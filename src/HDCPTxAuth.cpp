@@ -17,16 +17,17 @@
 HDCPTxAuth::HDCPTxAuth() :
     mRepeaterRxVer(REPEATER_RX_VERSION_NONE),
     mUEventCallback(NULL),
-    mMute(false){
-    int ret;
-    pthread_t id;
+    mMute(false),
+    pthreadIdHdcpTx(0) {
 
     syslog(LOG_INFO, "HDCPTxAuth::HDCPTxAuth");
     if (sem_init(&pthreadTxSem, 0, 0) < 0) {
         syslog(LOG_ERR, "HDCPTxAuth sem_init fail");
         exit(0);
     }
-    ret = pthread_create(&id, NULL, TxUEventThread, this);
+
+    pthread_t id;
+    int ret = pthread_create(&id, NULL, TxUEventThread, this);
     if (ret != 0) {
         syslog(LOG_ERR, "create TxUeventThread failed!\n");
     }
