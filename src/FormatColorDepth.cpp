@@ -15,9 +15,6 @@
 
 //this is prior selected list  of 4k2k50hz, 4k2k60hz smpte50hz,smpte60hz
 static const char* COLOR_ATTRIBUTE_LIST1[] = {
-    COLOR_YCBCR420_12BIT,
-    COLOR_YCBCR420_10BIT,
-    COLOR_YCBCR420_8BIT,
     COLOR_YCBCR422_12BIT,
     COLOR_YCBCR422_10BIT,
     COLOR_YCBCR444_8BIT,
@@ -25,8 +22,15 @@ static const char* COLOR_ATTRIBUTE_LIST1[] = {
     COLOR_RGB_8BIT,
 };
 
-//this is prior selected list  of other display mode
+//this is prior selected list  of 4k2k50hz420, 4k2k60hz420, smpte50hz420, smpte60hz420
 static const char* COLOR_ATTRIBUTE_LIST2[] = {
+    COLOR_YCBCR420_12BIT,
+    COLOR_YCBCR420_10BIT,
+    COLOR_YCBCR420_8BIT,
+};
+
+//this is prior selected list  of other display mode
+static const char* COLOR_ATTRIBUTE_LIST3[] = {
     COLOR_YCBCR444_12BIT,
     COLOR_YCBCR422_12BIT,
     COLOR_RGB_12BIT,
@@ -81,8 +85,8 @@ void FormatColorDepth::getHdmiColorAttribute(const char* outputmode, char* color
     mSysWrite.readSysfs(SYSFS_DISPLAY_MODE, curMode);
 
     // if only change deepcolor in MoreSettings, getcolorAttr from ubootenv, it was set in DroidTvSettings
-    if ((state == OUTPUT_MODE_STATE_SWITCH) && (!strcmp(curMode, outputmode)) && getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0) || (state == OUTPUT_MODE_STATE_POWER)) {
-            //note: "outputmode" should be the second parameter of "strcmp", because it maybe prefix of "curMode".
+    if (((state == OUTPUT_MODE_STATE_SWITCH) && (!strcmp(curMode, outputmode)) || (state == OUTPUT_MODE_STATE_POWER)) && getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0)) {
+        //note: "outputmode" should be the second parameter of "strcmp", because it maybe prefix of "curMode".
         syslog(LOG_INFO, "FormatColorDepth::getHdmiColorAttribute: Only modify deep color mode, get colorAttr from ubootenv.var.colorattribute\n");
         getBootEnv(UBOOTENV_COLORATTRIBUTE, colorAttribute);
         if (isModeSupportDeepColorAttr(outputmode, colorAttribute)) {
@@ -103,20 +107,7 @@ void FormatColorDepth::getProperHdmiColorArrtibute(const char* outputmode, char*
     char tmpValue[MODE_LEN] = {0};
     char isBestMode[MODE_LEN] = {0};
 
-    // if auto switch best mode is off, get priority color value of mode in ubootenv,
-    // and judge current mode whether this colorValue is supported in This TV device.
-    // if not support or auto switch best mode is on, select color value from Lists in next step.
-   /* if (getBootEnv(UBOOTENV_ISBESTMODE, isBestMode) && (strcmp(isBestMode, "false") == 0)) {
-        syslog(LOG_INFO, "FormatColorDepth::getProperHdmiColorAttribute: get color attr from ubootenv.var.%s_deepcolor When is not best mode\n", outputmode);
-        sprintf(ubootvar, "ubootenv.var.%s_deepcolor", outputmode);
-        if (getBootEnv(ubootvar, tmpValue) && strstr(tmpValue, "bit") && isModeSupportDeepColorAttr(outputmode, tmpValue)) {
-            strcpy(colorAttribute, tmpValue);
-            return;
-        }
-    }*/
-
     getBestHdmiDeepColorAttr(outputmode, colorAttribute);
-
     //if colorAttr is null above steps, will defines a initial value to it
     if (!strstr(colorAttribute, "bit")) {
         strcpy(colorAttribute, COLOR_YCBCR444_8BIT);
@@ -138,9 +129,13 @@ void FormatColorDepth::getBestHdmiDeepColorAttr(const char *outputmode, char* co
         || !strcmp(outputmode, MODE_4K2KSMPTE60HZ) || !strcmp(outputmode, MODE_4K2KSMPTE50HZ)) {
         colorList = COLOR_ATTRIBUTE_LIST1;
         length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST1);
-    } else {
+    } else if (!strcmp(outputmode, MODE_4K2K50HZ420) || !strcmp(outputmode, MODE_4K2K60HZ420) ||
+        !strcmp(outputmode, MODE_4K2KSMPTE50HZ420) || !strcmp(outputmode, MODE_4K2KSMPTE60HZ420)) {
         colorList = COLOR_ATTRIBUTE_LIST2;
         length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST2);
+    } else {
+        colorList = COLOR_ATTRIBUTE_LIST3;
+        length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST3);
     }
 
     for (int i = 0; i < length; i++) {
