@@ -63,8 +63,8 @@ DisplayMode::~DisplayMode() {
 }
 
 bool DisplayMode::getBootEnv(const char* key, char* value) {
-    syslog(LOG_INFO, "DisplayMode::getBootEnv");
     const char* val = bootenv_get(key);
+    syslog(LOG_INFO, "DisplayMode::getBootEnv key:%s value:%s", key, val);
 
     if (val) {
         strcpy(value, val);

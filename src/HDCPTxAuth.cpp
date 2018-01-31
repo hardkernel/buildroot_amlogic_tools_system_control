@@ -17,16 +17,17 @@
 HDCPTxAuth::HDCPTxAuth() :
     mRepeaterRxVer(REPEATER_RX_VERSION_NONE),
     mUEventCallback(NULL),
-    mMute(false){
-    int ret;
-    pthread_t id;
+    mMute(false),
+    pthreadIdHdcpTx(0) {
 
     syslog(LOG_INFO, "HDCPTxAuth::HDCPTxAuth");
     if (sem_init(&pthreadTxSem, 0, 0) < 0) {
         syslog(LOG_ERR, "HDCPTxAuth sem_init fail");
         exit(0);
     }
-    ret = pthread_create(&id, NULL, TxUEventThread, this);
+
+    pthread_t id;
+    int ret = pthread_create(&id, NULL, TxUEventThread, this);
     if (ret != 0) {
         syslog(LOG_ERR, "create TxUeventThread failed!\n");
     }
@@ -297,14 +298,12 @@ void HDCPTxAuth::startVer22() {
     if (status < 0) {
         syslog(LOG_ERR, "HDCPTxAuth startVer22: start hdcp_tx 2.2 failed:%s\n", strerror(errno));
     }
-    usleep(2*1000*1000);
 }
 
 void HDCPTxAuth::startVer14() {
     //start hdcp_tx 1.4
     syslog(LOG_INFO, "HDCPTxAuth startVer14: start hdcp_tx 1.4\n");
     mSysWrite.writeSysfs(DISPLAY_HDMI_HDCP_MODE, DISPLAY_HDMI_HDCP_14);
-    usleep(1*1000*1000);
 }
 
 void *HDCPTxAuth::TxUEventThread(void *data) {
