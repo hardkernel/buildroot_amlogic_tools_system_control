@@ -414,6 +414,10 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
         if (strstr(outputmode, "cvbs") == NULL) {
             pTxAuth->start();
 	}
+        pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
+        pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
+        pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
+        setOsdMouse(outputmode);
     } else {
 	if (strstr(outputmode, "cvbs") == NULL) {
             if (!strcmp(hdcpmode, "0")) {
@@ -467,7 +471,11 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
 
         syslog(LOG_INFO, "DisplayMode is auto mode, need find the best mode\n");
         getHdmiData(&data);
-        getHdmiOutputMode((char *)outputmode, &data);
+        if (HDMI_SINK_TYPE_NONE == data.sink_type) {
+            getBootEnv(UBOOTENV_CVBSMODE, (char *)outputmode);
+        } else {
+            getHdmiOutputMode((char *)outputmode, &data);
+        }
     }
 
     pSysWrite->readSysfs(HDMI_TX_FRAMRATE_POLICY, value);
