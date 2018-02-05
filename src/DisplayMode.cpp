@@ -410,7 +410,7 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
     pSysWrite->readSysfs(DISPLAY_HDMI_HDCP_VER, curHdcpRxVer);
     syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode hdcpmode:%s, outputmode:%s\n", hdcpmode, outputmode);
 
-    if (OUTPUT_MODE_STATE_INIT == state) {
+    if (OUTPUT_MODE_STATE_INIT == state || !strcmp(hdcpmode, "3")) {
         if (strstr(outputmode, "cvbs") == NULL) {
             pTxAuth->start();
 	}
@@ -540,6 +540,7 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     }
 
     //update window_axis
+    updateFreeScaleAxis();
     updateWindowAxis(outputmode);
 
     //4. turn on phy and clear avmute
@@ -620,6 +621,7 @@ bool DisplayMode::isHDCPTxAuthSuccess() {
 }
 
 void DisplayMode::updateFreeScaleAxis() {
+    syslog(LOG_INFO, "DisplayMode:::updateFreeScaleAxis\n");
     char axis[MAX_STR_LEN] = {0};
     sprintf(axis, "%d %d %d %d",
             0, 0, mDisplayWidth - 1, mDisplayHeight - 1);
@@ -627,6 +629,7 @@ void DisplayMode::updateFreeScaleAxis() {
 }
 
 void DisplayMode::updateWindowAxis(const char* outputmode) {
+    syslog(LOG_INFO, "DisplayMode:::updateWindowAxis\n");
     char axis[MAX_STR_LEN] = {0};
     int position[4] = { 0, 0, 0, 0 };//x,y,w,h
     getPosition(outputmode, position);

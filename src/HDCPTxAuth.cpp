@@ -332,12 +332,6 @@ void *HDCPTxAuth::TxUEventThread(void *data) {
                 pThiz->mSysWrite.writeSysfs(DISPLAY_HDMI_HDCP_POWER, "1");
             }
         } else if (!strcmp(ueventData.matchName, HDMI_TX_HDCP_UEVENT) && !strcmp(ueventData.switchName, HDMI_UEVENT_HDCP)) {
-            //0: hdcp failure -> mute a/v
-            if (!strcmp(ueventData.switchState, "0"))
-                pThiz->mute(true);
-            //1:  hdcp success -> unmute a/v
-            else
-                pThiz->mute(false);
         }
     }
 
