@@ -410,7 +410,7 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
     pSysWrite->readSysfs(DISPLAY_HDMI_HDCP_VER, curHdcpRxVer);
     syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode hdcpmode:%s, outputmode:%s\n", hdcpmode, outputmode);
 
-    if (OUTPUT_MODE_STATE_INIT == state || !strcmp(hdcpmode, "3")) {
+    if (OUTPUT_MODE_STATE_INIT == state) {
         if (strstr(outputmode, "cvbs") == NULL) {
             pTxAuth->start();
 	}
@@ -431,8 +431,9 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
                     pTxAuth->stopVerAll();
                     pTxAuth->startVer14();
                     isHDCPTxAuthSuccess();
+                    pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
 		}
-            } else if (!strcmp(hdcpmode, "2") || !strcmp(hdcpmode, "22") || !strcmp(hdcpmode, "auto")) {
+            } else if (!strcmp(hdcpmode, "2") || !strcmp(hdcpmode, "22") || !strcmp(hdcpmode, "auto") || !strcmp(hdcpmode, "3")) {
 		if (OUTPUT_MODE_STATE_SWITCH == state) {
 		    pTxAuth->stop();
 		    pTxAuth->start();
@@ -440,19 +441,20 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
 		    pTxAuth->start();
 		}
             }
-            pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
-            //when play video,hotplug close fb0
-            pSysWrite->executeCMD("cat sys/class/vfm/map|awk '/decoder.*?amvideo/{print $0}'", registerValue);
-            syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode registerValue:%s\n", registerValue);
-            if (strstr(registerValue, "decoder(1)") && strstr(registerValue, "amvideo")) {
-                pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "1");
-            } else {
-                pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
-                pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
-                setOsdMouse(outputmode);
-            }
-            pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "-1");
+	}
+        pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
+        //when play video,hotplug close fb0
+        pSysWrite->executeCMD("cat sys/class/vfm/map|awk '/decoder.*?amvideo/{print $0}'", registerValue);
+        syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode registerValue:%s\n", registerValue);
+        if (strstr(registerValue, "decoder(1)") && strstr(registerValue, "amvideo")) {
+            pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "1");
+	    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
+        } else {
+            pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "0");
+            pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
+            setOsdMouse(outputmode);
         }
+        pSysWrite->writeSysfs(DISPLAY_HDMI_AVMUTE, "-1");
     }
 }
 
@@ -540,7 +542,6 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     }
 
     //update window_axis
-    updateFreeScaleAxis();
     updateWindowAxis(outputmode);
 
     //4. turn on phy and clear avmute
@@ -585,27 +586,28 @@ void DisplayMode::saveDeepColorAttr(const char *mode, const char *dcValue) {
 }
 
 void DisplayMode::updateDeepColor(bool cvbsMode, output_mode_state state, const char *outputmode) {
-    if (cvbsMode)
-        return;
+    if (!cvbsMode) {
+        char colorAttribute[MODE_LEN] = {0,};
+        char mode[MODE_LEN] = {0,};
+        char attr[MODE_LEN] = {0,};
+        FormatColorDepth deepColor;
 
-    char colorAttribute[MODE_LEN] = {0,};
-    char mode[MODE_LEN] = {0,};
-    char attr[MODE_LEN] = {0,};
-    FormatColorDepth deepColor;
-
-    deepColor.getHdmiColorAttribute(outputmode, colorAttribute, (int)state);
-    pSysWrite->readSysfs(DISPLAY_HDMI_COLOR_ATTR, attr);
-    if (strstr(attr, colorAttribute) == NULL) {
-        syslog(LOG_INFO, "DisplayMode DeepColorAttr is different from sysfs value");
-        pSysWrite->writeSysfs(SYSFS_DISPLAY_MODE, "null");
-        pSysWrite->writeSysfs(DISPLAY_HDMI_COLOR_ATTR, colorAttribute);
+        deepColor.getHdmiColorAttribute(outputmode, colorAttribute, (int)state);
+        pSysWrite->readSysfs(DISPLAY_HDMI_COLOR_ATTR, attr);
+        if (strstr(attr, colorAttribute) == NULL) {
+            syslog(LOG_INFO, "DisplayMode DeepColorAttr is different from sysfs value");
+            pSysWrite->writeSysfs(SYSFS_DISPLAY_MODE, "null");
+            pSysWrite->writeSysfs(DISPLAY_HDMI_COLOR_ATTR, colorAttribute);
+        } else {
+            syslog(LOG_INFO, "DisplayMode current deepColorAttr is euqals to colorAttribute, do not need to set");
+        }
+        syslog(LOG_INFO, "DisplayMode colorAttribute %s", colorAttribute);
+        //save to ubootenv
+        saveDeepColorAttr(outputmode, colorAttribute);
+        setBootEnv(UBOOTENV_COLORATTRIBUTE, colorAttribute);
     } else {
-        syslog(LOG_INFO, "DisplayMode current deepColorAttr is euqals to colorAttribute, do not need to set");
+        pSysWrite->writeSysfs(DISPLAY_HDMI_COLOR_ATTR, "default");
     }
-    syslog(LOG_INFO, "DisplayMode colorAttribute %s", colorAttribute);
-    //save to ubootenv
-    saveDeepColorAttr(outputmode, colorAttribute);
-    setBootEnv(UBOOTENV_COLORATTRIBUTE, colorAttribute);
 }
 
 
