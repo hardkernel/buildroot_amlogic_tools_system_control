@@ -227,6 +227,7 @@ void DisplayMode::getHighestHdmiMode(char* mode, hdmi_data_t* data) {
 
     startpos = data->edid;
     strcpy(value, DEFAULT_OUTPUT_MODE);
+    env = getenv(PROP_SUPPORT_4K);
 
     while (strlen(startpos) > 0) {
         //get edid resolution to tempMode in order.
@@ -237,7 +238,6 @@ void DisplayMode::getHighestHdmiMode(char* mode, hdmi_data_t* data) {
         memset(tempMode, 0, MODE_LEN);
         strncpy(tempMode, startpos, destpos - startpos);
         startpos = destpos + 1;
-        env = getenv(PROP_SUPPORT_4K);
         if (env && !strcmp(env, "false") && (strstr(tempMode, "2160") || strstr(tempMode, "smpte"))) {
             syslog(LOG_ERR, "DisplayMode platform not support : %s\n", tempMode);
             continue;
@@ -465,7 +465,7 @@ void DisplayMode::setSourceOutputMode(const char* outputmode){
 void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state state) {
     syslog(LOG_INFO, "DisplayMode::setSourceOutputMode");
     char value[MAX_STR_LEN] = {0};
-
+    char *env;
     bool cvbsMode = false;
 
     if (!strcmp(outputmode, "auto")) {
@@ -478,6 +478,12 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
         } else {
             getHdmiOutputMode((char *)outputmode, &data);
         }
+    }
+
+    env = getenv(PROP_SUPPORT_4K);
+    if (env && !strcmp(env, "false") && (strstr(outputmode, "2160") || strstr(outputmode, "smpte"))) {
+        syslog(LOG_ERR, "4k not support!\n");
+        return;
     }
 
     pSysWrite->readSysfs(HDMI_TX_FRAMRATE_POLICY, value);

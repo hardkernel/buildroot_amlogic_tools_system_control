@@ -5,6 +5,7 @@
 
 start() {
 	printf "Starting SystemControl: "
+	source /etc/property_set.sh
 	mkdir -p /run/systemcontrol
 	/usr/bin/systemcontrol &
 	echo "OK"

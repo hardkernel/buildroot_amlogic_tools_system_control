@@ -146,7 +146,7 @@
 #define HDR_MODE_ON                     "1"
 #define HDR_MODE_AUTO                   "2"
 
-#define PROP_SUPPORT_4K                 "ro.platform.support.4k"
+#define PROP_SUPPORT_4K                 "HDMI_4K_SUPPORT"
 #define SDR_MODE_OFF                    "0"
 #define SDR_MODE_AUTO                   "2"
 
