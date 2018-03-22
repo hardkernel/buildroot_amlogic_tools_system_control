@@ -15,6 +15,9 @@
 
 //this is prior selected list  of 4k2k50hz, 4k2k60hz smpte50hz,smpte60hz
 static const char* COLOR_ATTRIBUTE_LIST1[] = {
+    COLOR_YCBCR420_12BIT,
+    COLOR_YCBCR420_10BIT,
+    COLOR_YCBCR420_8BIT,
     COLOR_YCBCR422_12BIT,
     COLOR_YCBCR422_10BIT,
     COLOR_YCBCR444_8BIT,
@@ -22,15 +25,8 @@ static const char* COLOR_ATTRIBUTE_LIST1[] = {
     COLOR_RGB_8BIT,
 };
 
-//this is prior selected list  of 4k2k50hz420, 4k2k60hz420, smpte50hz420, smpte60hz420
-static const char* COLOR_ATTRIBUTE_LIST2[] = {
-    COLOR_YCBCR420_12BIT,
-    COLOR_YCBCR420_10BIT,
-    COLOR_YCBCR420_8BIT,
-};
-
 //this is prior selected list  of other display mode
-static const char* COLOR_ATTRIBUTE_LIST3[] = {
+static const char* COLOR_ATTRIBUTE_LIST2[] = {
     COLOR_YCBCR444_12BIT,
     COLOR_YCBCR422_12BIT,
     COLOR_RGB_12BIT,
@@ -49,6 +45,7 @@ FormatColorDepth::~FormatColorDepth() {
 }
 
 bool FormatColorDepth::initColorAttribute(char* supportedColorList, int len) {
+    syslog(LOG_INFO, "FormatColorDepth::initColorAttribute");
     int count = 0;
     bool result = false;
 
@@ -72,10 +69,17 @@ bool FormatColorDepth::initColorAttribute(char* supportedColorList, int len) {
 }
 
 void FormatColorDepth::getHdmiColorAttribute(const char* outputmode, char* colorAttribute, int state) {
+    syslog(LOG_INFO, "FormatColorDepth::getHdmiColorAttribute");
     char supportedColorList[MAX_STR_LEN];
 
     //if read /sys/class/amhdmitx/amhdmitx0/dc_cap is null. return
     if (!initColorAttribute(supportedColorList, MAX_STR_LEN)) {
+        if (!strcmp(outputmode, MODE_4K2K60HZ) || !strcmp(outputmode, MODE_4K2K50HZ)
+              || !strcmp(outputmode, MODE_4K2KSMPTE60HZ) || !strcmp(outputmode, MODE_4K2KSMPTE50HZ)) {
+            strcpy(colorAttribute, COLOR_YCBCR420_8BIT);
+        } else {
+            strcpy(colorAttribute, COLOR_YCBCR444_8BIT);
+        }
         syslog(LOG_ERR, "FormatColorDepth::getHdmiColorAttribute: Error!!! Do not find sink color list, use default color attribute:%s\n", colorAttribute);
         return;
     }
@@ -103,6 +107,7 @@ void FormatColorDepth::getHdmiColorAttribute(const char* outputmode, char* color
 }
 
 void FormatColorDepth::getProperHdmiColorArrtibute(const char* outputmode, char* colorAttribute) {
+    syslog(LOG_INFO, "FormatColorDepth::getProperHdmiColorArrtibute");
     char ubootvar[MODE_LEN] = {0};
     char tmpValue[MODE_LEN] = {0};
     char isBestMode[MODE_LEN] = {0};
@@ -116,6 +121,7 @@ void FormatColorDepth::getProperHdmiColorArrtibute(const char* outputmode, char*
 }
 
 void FormatColorDepth::getBestHdmiDeepColorAttr(const char *outputmode, char* colorAttribute) {
+    syslog(LOG_INFO, "FormatColorDepth::getBestHdmiDeepColorAttr");
     char *pos = NULL;
     int length = 0;
     const char **colorList = NULL;
@@ -129,13 +135,9 @@ void FormatColorDepth::getBestHdmiDeepColorAttr(const char *outputmode, char* co
         || !strcmp(outputmode, MODE_4K2KSMPTE60HZ) || !strcmp(outputmode, MODE_4K2KSMPTE50HZ)) {
         colorList = COLOR_ATTRIBUTE_LIST1;
         length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST1);
-    } else if (!strcmp(outputmode, MODE_4K2K50HZ420) || !strcmp(outputmode, MODE_4K2K60HZ420) ||
-        !strcmp(outputmode, MODE_4K2KSMPTE50HZ420) || !strcmp(outputmode, MODE_4K2KSMPTE60HZ420)) {
+    } else {
         colorList = COLOR_ATTRIBUTE_LIST2;
         length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST2);
-    } else {
-        colorList = COLOR_ATTRIBUTE_LIST3;
-        length = ARRAY_SIZE(COLOR_ATTRIBUTE_LIST3);
     }
 
     for (int i = 0; i < length; i++) {
