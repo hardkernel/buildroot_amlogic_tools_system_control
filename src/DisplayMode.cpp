@@ -468,7 +468,7 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
         syslog(LOG_INFO, "DisplayMode is auto mode, need find the best mode\n");
         getHdmiData(&data);
         if (HDMI_SINK_TYPE_NONE == data.sink_type) {
-            getBootEnv(UBOOTENV_CVBSMODE, (char *)outputmode);
+            strcpy((char *)outputmode, MODE_576CVBS);
         } else {
             getHdmiOutputMode((char *)outputmode, &data);
         }

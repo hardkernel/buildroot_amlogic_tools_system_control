@@ -32,20 +32,27 @@ static void strsplit(char cmd[128], char* value1, char* value2, char* value3)
         len++;
         char* temp = (char *)calloc(128, sizeof(char));
         char* temp1 = (char *)calloc(128, sizeof(char));
+        char* temp2 = (char *)calloc(128, sizeof(char));
 
         memcpy(temp, &cmd[i], 2);
         memcpy(temp1, &cmd[i], 4);
+        memcpy(temp2, &cmd[i], 4);
         char target[] = "hz";
         char autoTarget[] = "auto";
+        char cvbsTarget[] = "cvbs";
         if (strcmp(temp,target) == 0) {
             len++;
             break;
         } else if (strcmp(temp1, autoTarget) == 0) {
             len += 3;
             break;
+        } else if (strcmp(temp2, cvbsTarget) == 0) {
+            len += 3;
+	    break;
         }
         free(temp);
         free(temp1);
+        free(temp2);
     }
 
     memcpy(value1, &cmd[start], len);
