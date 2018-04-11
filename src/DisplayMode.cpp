@@ -58,7 +58,7 @@ DisplayMode::~DisplayMode() {
 
 bool DisplayMode::getBootEnv(const char* key, char* value) {
     const char* val = bootenv_get(key);
-    syslog(LOG_INFO, "DisplayMode::getBootEnv key:%s value:%s", key, val);
+    syslog(LOG_INFO, "getBootEnv key:%s value:%s", key, val);
 
     if (val) {
         strcpy(value, val);
@@ -394,7 +394,6 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode) {
 }
 
 void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state state) {
-    char registerValue[1024] = {0};
     char outputmode[MODE_LEN] = {0};
     char saveHdcpRxVer[MODE_LEN] = {0};
     char curHdcpRxVer[MODE_LEN] = {0};
@@ -438,9 +437,7 @@ void DisplayMode::setSourceHdcpMode(const char* hdcpmode, output_mode_state stat
 	}
         pSysWrite->writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
         //when play video,hotplug close fb0
-        pSysWrite->executeCMD("cat sys/class/vfm/map|awk '/decoder.*?amvideo/{print $0}'", registerValue);
-        syslog(LOG_INFO, "DisplayMode::setSourceHdcpMode registerValue:%s\n", registerValue);
-        if (strstr(registerValue, "decoder(1)") && strstr(registerValue, "amvideo")) {
+        if (playVideoDetect()) {
             pSysWrite->writeSysfs(DISPLAY_FB0_BLANK, "1");
 	    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
         } else {
@@ -544,6 +541,12 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     //update window_axis
     updateWindowAxis(outputmode);
 
+    syslog(LOG_INFO, "DisplayMode curmode:%s, outputmode:%s\n", curMode, outputmode);
+    //switch resolution when play video, set small-window video/axis
+    if (playVideoDetect() && (strstr(curMode, outputmode) == NULL)) {
+        setRecWindowVideoAxis();
+    }
+
     //4. turn on phy and clear avmute
     if (OUTPUT_MODE_STATE_INIT != state && !cvbsMode) {
         pSysWrite->writeSysfs(DISPLAY_HDMI_PHY, "1"); /* Turn on TMDS PHY */
@@ -566,6 +569,59 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     }
 
     syslog(LOG_INFO, "DisplayMode set output mode:%s done\n", outputmode);
+}
+
+bool DisplayMode::playVideoDetect() {
+    syslog(LOG_INFO, "DisplayMode::playVideoDetect");
+    char registerValue[1024] = {0};
+    pSysWrite->executeCMD("cat sys/class/vfm/map|awk '/decoder.*?amvideo/{print $0}'", registerValue);
+    syslog(LOG_INFO, "DisplayMode::playVideoDetect registerValue:%s\n", registerValue);
+    if (strstr(registerValue, "decoder(1)") && strstr(registerValue, "amvideo")) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+//switch resolution when playing video,it need set video_axis in small window
+void DisplayMode::setRecWindowVideoAxis() {
+    syslog(LOG_INFO, "DisplayMode::setRecWindowVideoAxis");
+    char currMode[MODE_LEN] = {0};
+    char oldMode[MODE_LEN] = {0};
+    int currPos[4] = {0};//x,y,w,h
+    int oldPos[4] = {0};
+    char axis[MAX_STR_LEN] = {0};
+
+    pSysWrite->readSysfs(SYSFS_VIDEO_AXIS, axis);
+    pSysWrite->readSysfs(SYSFS_DISPLAY_MODE, currMode);
+    getBootEnv(UBOOTENV_OUTPUTMODE, oldMode);
+    syslog(LOG_INFO, "DisplayMode::setRecWindowVideoAxis oldMode: %s, old video_axis: %s\n", oldMode, axis);
+
+    if (strstr(axis, "0 0")) {
+        syslog(LOG_INFO, "Video is playing in full screen, don't need set video axis\n");
+        return;
+    }
+
+    //set video axis in small window
+    getPosition(currMode, currPos);
+    getPosition(oldMode, oldPos);
+    //split like 200 300 400 500 and into int type
+    int videoAxis[4] = {0};
+    char delim[] = " ";
+    char* pAxis = strtok(axis, delim);
+    for (int i=0; i<4; i++) {
+        if (pAxis != NULL) {
+            videoAxis[i] = atoi(pAxis);
+        }
+        pAxis = strtok(NULL, delim);
+    }
+
+    //syslog(LOG_INFO, "setRecWindowVideoAxis axis is %d %d %d %d\n", videoAxis[0], videoAxis[1], videoAxis[2], videoAxis[3]);
+
+    sprintf(axis, "%d %d %d %d",
+            videoAxis[0]*currPos[2]/oldPos[2], videoAxis[1]*currPos[3]/oldPos[3], videoAxis[2]*currPos[2]/oldPos[2], videoAxis[3]*currPos[3]/oldPos[3]);
+    syslog(LOG_INFO, "DisplayMode::setRecWindowVideoAxis currMode %s write %s: %s\n", currMode, SYSFS_VIDEO_AXIS, axis);
+    pSysWrite->writeSysfs(SYSFS_VIDEO_AXIS, axis);
 }
 
 void DisplayMode::setAutoSwitchFrameRate(int state) {

@@ -13,6 +13,7 @@
 #define SYSFS_DISPLAY_MODE              "/sys/class/display/mode"
 #define SYS_DISABLE_VIDEO               "/sys/class/video/disable_video"
 #define SYSFS_DISPLAY_AXIS              "/sys/class/display/axis"
+#define SYSFS_VIDEO_AXIS                "/sys/class/video/axis"
 #define VIDEO_LAYER_ENABLE              "0"
 #define VIDEO_LAYER_DISABLE             "1"
 #define VIDEO_LAYER_AUTO_ENABLE         "2"
@@ -237,7 +238,9 @@ public:
     void setDigitalMode(const char* mode);
     void setOsdMouse(const char* curMode);
     void setOsdMouse(int x, int y, int w, int h);
+    void setRecWindowVideoAxis();
     void getPosition(const char* curMode, int *position);
+    bool playVideoDetect();
     bool isHDCPTxAuthSuccess();
 private:
     bool getBootEnv(const char *key, char *value);
