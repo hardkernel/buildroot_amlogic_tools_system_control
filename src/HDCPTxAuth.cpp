@@ -170,7 +170,7 @@ void* HDCPTxAuth::authThread(void* data) {
     if (pThiz->authInit(&hdcp22, &hdcp14)) {
         if (!pThiz->authLoop(hdcp22, hdcp14)) {
             syslog(LOG_ERR, "HDCPTxAuth HDCP authenticate fail,need black screen and disable audio\n");
-            pThiz->mSysWrite.writeSysfs(AV_HDMI_CONFIG, "audio_off");
+            //pThiz->mSysWrite.writeSysfs(AV_HDMI_CONFIG, "audio_off");
             return NULL;
         }
         pThiz->mSysWrite.writeSysfs(SYS_DISABLE_VIDEO, VIDEO_LAYER_AUTO_ENABLE);
