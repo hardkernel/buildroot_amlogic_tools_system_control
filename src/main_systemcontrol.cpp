@@ -165,19 +165,25 @@ int main(int argc, char **argv) {
                 }
                 len = read(ns, &cmd, sizeof(cmd));
                 syslog(LOG_CRIT, "system control service read cmd len(%d) (%s)", len, cmd);
-                char* displaymode = (char *)calloc(128, sizeof(char));
-                char* colormode = (char *)calloc(128, sizeof(char));
-                char* hdcpmode = (char *)calloc(128, sizeof(char));
-                strsplit(cmd, displaymode, colormode, hdcpmode);
-                syslog(LOG_CRIT, "system control service displaymode(%s) colormode(%s) hdcpmode(%s)", displaymode, colormode, hdcpmode);
-                pSystemControl->setBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
-                pSystemControl->setTvColorFormat(colormode);
-                pSystemControl->setTvOutputMode(displaymode);
-                pSystemControl->setTvHdcpMode(hdcpmode);
+                if (!strcmp(cmd, "zoomout")) {
+                    pSystemControl->setZoomOut();
+                } else if (!strcmp(cmd, "zoomin")) {
+                    pSystemControl->setZoomIn();
+                } else {
+                    char* displaymode = (char *)calloc(128, sizeof(char));
+                    char* colormode = (char *)calloc(128, sizeof(char));
+                    char* hdcpmode = (char *)calloc(128, sizeof(char));
+                    strsplit(cmd, displaymode, colormode, hdcpmode);
+                    syslog(LOG_CRIT, "system control service displaymode(%s) colormode(%s) hdcpmode(%s)", displaymode, colormode, hdcpmode);
+                    pSystemControl->setBootEnv(UBOOTENV_HDCPMODE, hdcpmode);
+                    pSystemControl->setTvColorFormat(colormode);
+                    pSystemControl->setTvOutputMode(displaymode);
+                    pSystemControl->setTvHdcpMode(hdcpmode);
 
-                free(colormode);
-                free(displaymode);
-                free(hdcpmode);
+                    free(colormode);
+                    free(displaymode);
+                    free(hdcpmode);
+                }
             }
         }
     }

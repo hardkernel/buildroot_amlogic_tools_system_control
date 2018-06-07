@@ -12,6 +12,8 @@ public:
     void setTvOutputMode(const char* mode);
     void setTvColorFormat(const char* mode);
     void setTvHdcpMode(const char* mode);
+    void setZoomOut();
+    void setZoomIn();
 
 private:
     DisplayMode *pDisplayMode;

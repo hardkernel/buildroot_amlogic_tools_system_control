@@ -154,6 +154,7 @@
 #define UBOOTENV_OUTPUTMODE             "ubootenv.var.outputmode"
 #define UBOOTENV_ISBESTMODE             "ubootenv.var.is.bestmode"
 #define UBOOTENV_EDIDCRCVALUE           "ubootenv.var.edid.crcvalue"
+#define UBOOTENV_DISPLAYPERCENT         "ubootenv.var.displaypercent"
 
 enum {
     DISPLAY_MODE_480I                   = 0,
@@ -240,11 +241,16 @@ public:
     void setOsdMouse(int x, int y, int w, int h);
     void setRecWindowVideoAxis();
     void getPosition(const char* curMode, int *position);
+    void setPosition(int left, int top, int width, int height);
+    void zoomByPercent(int percent);
+    void zoomIn();
+    void zoomOut();
     bool playVideoDetect();
     bool isHDCPTxAuthSuccess();
 private:
     bool getBootEnv(const char *key, char *value);
     void setBootEnv(const char *key, const char *value);
+    int getBootenvInt(const char* key, int defaultVal);
     int parseConfigFile();
     void getHighestHdmiMode(char* mode, hdmi_data_t* data);
     void filterHdmiMode(char * mode, hdmi_data_t* data);
@@ -260,6 +266,7 @@ private:
     void updateWindowAxis(const char* outputmode);
     void dumpCap(const char * path, const char * hint, char *result);
     void dumpCaps(char *result=NULL);
+    void zoom(int step);
 
     const char* pConfigPath;
     char mSocType[64];

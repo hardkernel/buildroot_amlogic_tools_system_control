@@ -72,6 +72,16 @@ void DisplayMode::setBootEnv(const char* key, const char* value) {
     bootenv_update(key, value);
 }
 
+int DisplayMode::getBootenvInt(const char* key, int defaultVal) {
+    int value = defaultVal;
+    const char* p_value = bootenv_get(key);
+    if (p_value) {
+        value = atoi(p_value);
+    }
+    syslog(LOG_INFO, "getBootenvInt key:%s value:%d", key, value);
+    return value;
+}
+
 void DisplayMode::init() {
     syslog(LOG_INFO, "DisplayMode::init");
     parseConfigFile();
@@ -740,13 +750,144 @@ void DisplayMode::getPosition(const char* curMode, int *position) {
     }
 
     sprintf(ubootvar, "ubootenv.var.%s_x", keyValue);
-    position[0] =  0;
+    position[0] = getBootenvInt(ubootvar, 0);
     sprintf(ubootvar, "ubootenv.var.%s_y", keyValue);
-    position[1] = 0;
+    position[1] = getBootenvInt(ubootvar, 0);
     sprintf(ubootvar, "ubootenv.var.%s_w", keyValue);
-    position[2] = defaultWidth;
+    position[2] = getBootenvInt(ubootvar, defaultWidth);
     sprintf(ubootvar, "ubootenv.var.%s_h", keyValue);
-    position[3] = defaultHeight;
+    position[3] = getBootenvInt(ubootvar, defaultHeight);
+}
+
+void DisplayMode::setPosition(int left, int top, int width, int height) {
+    syslog(LOG_INFO, "DisplayMode:::setPosition x:%d, y:%d, w:%d, h:%d\n", left, top, width, height);
+
+    char x[512] = {0};
+    char y[512] = {0};
+    char w[512] = {0};
+    char h[512] = {0};
+    sprintf(x, "%d", left);
+    sprintf(y, "%d", top);
+    sprintf(w, "%d", width);
+    sprintf(h, "%d", height);
+
+    char curMode[MODE_LEN] = {0};
+    pSysWrite->readSysfs(SYSFS_DISPLAY_MODE, curMode);
+
+    char keyValue[20] = {0};
+    char ubootvar[100] = {0};
+    if (strstr(curMode, "480")) {
+        strcpy(keyValue, strstr(curMode, MODE_480P_PREFIX) ? MODE_480P_PREFIX : MODE_480I_PREFIX);
+    } else if (strstr(curMode, "576")) {
+        strcpy(keyValue, strstr(curMode, MODE_576P_PREFIX) ? MODE_576P_PREFIX : MODE_576I_PREFIX);
+    } else if (strstr(curMode, MODE_720P_PREFIX)) {
+        strcpy(keyValue, MODE_720P_PREFIX);
+    } else if (strstr(curMode, MODE_768P_PREFIX)) {
+        strcpy(keyValue, MODE_768P_PREFIX);
+    } else if (strstr(curMode, MODE_1080I_PREFIX)) {
+        strcpy(keyValue, MODE_1080I_PREFIX);
+    } else if (strstr(curMode, MODE_1080P_PREFIX)) {
+        strcpy(keyValue, MODE_1080P_PREFIX);
+    } else if (strstr(curMode, MODE_4K2K_PREFIX)) {
+        strcpy(keyValue, MODE_4K2K_PREFIX);
+    } else if (strstr(curMode, MODE_4K2KSMPTE_PREFIX)) {
+        strcpy(keyValue, "4k2ksmpte");
+    }
+    sprintf(ubootvar, "ubootenv.var.%s_x", keyValue);
+    setBootEnv(ubootvar, x);
+    sprintf(ubootvar, "ubootenv.var.%s_y", keyValue);
+    setBootEnv(ubootvar, y);
+    sprintf(ubootvar, "ubootenv.var.%s_w", keyValue);
+    setBootEnv(ubootvar, w);
+    sprintf(ubootvar, "ubootenv.var.%s_h", keyValue);
+    setBootEnv(ubootvar, h);
+}
+
+void DisplayMode::zoomByPercent(int percent) {
+    syslog(LOG_INFO, "DisplayMode::zoomByPercent percent:%d\n", percent);
+    int maxRight = 0;
+    int maxBottom = 0;
+    int offsetStep = 2;
+    int currentLeft = 0;
+    int currentTop = 0;
+    int currentRight = 0;
+    int currentBottom = 0;
+    int currentWidth = 0;
+    int currentHeight = 0;
+
+    char curMode[MODE_LEN] = {0};
+    pSysWrite->readSysfs(SYSFS_DISPLAY_MODE, curMode);
+
+    if (strstr(curMode, "480")) {
+        maxRight = 719;
+        maxBottom = 479;
+    } else if (strstr(curMode, "576")) {
+	maxRight = 719;
+        maxBottom = 575;
+    } else if (strstr(curMode, MODE_720P_PREFIX)) {
+        maxRight = 1279;
+	maxBottom = 719;
+    } else if (strstr(curMode, "1080")) {
+        maxRight = 1919;
+        maxBottom = 1079;
+    } else if (strstr(curMode, MODE_4K2K_PREFIX)) {
+        maxRight = 3839;
+        maxBottom = 2159;
+    } else if (strstr(curMode, MODE_4K2KSMPTE_PREFIX)) {
+        maxRight = 4095;
+        maxBottom = 2159;
+    } else {
+        maxRight = 1919;
+        maxBottom = 1079;
+    }
+
+    if (percent > 100) {
+        percent = 100;
+        return;
+    }
+
+    if (percent < 80) {
+        percent = 80;
+        return;
+    }
+
+    currentLeft = (100 - percent)*(maxRight) / (100*2*offsetStep);
+    currentTop = (100 - percent)*(maxBottom) / (100*2*offsetStep);
+    currentRight = maxRight - currentLeft;
+    currentBottom = maxBottom - currentTop;
+    currentWidth = currentRight - currentLeft + 1;
+    currentHeight = currentBottom - currentTop + 1;
+
+    setPosition(currentLeft, currentTop, currentWidth, currentHeight);
+    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0");
+    updateWindowAxis(curMode);
+    setOsdMouse(curMode);
+    pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE, "0x10001");
+}
+
+void DisplayMode::zoom(int step) {
+    int percent = 0;
+    char percentValue[MODE_LEN] = {0};
+    percent = getBootenvInt(UBOOTENV_DISPLAYPERCENT, 100);
+    syslog(LOG_INFO, "DisplayMode::zoom percent=%d\n", percent);
+    percent = percent + step;
+    if (percent > 100) {
+        percent = 100;
+    } else if (percent < 80) {
+        percent = 80;
+    }
+
+    sprintf(percentValue, "%d", percent);
+    setBootEnv(UBOOTENV_DISPLAYPERCENT, percentValue);
+    zoomByPercent(percent);
+}
+
+void DisplayMode::zoomIn() {
+    zoom(1);
+}
+
+void DisplayMode::zoomOut() {
+    zoom(-1);
 }
 
 void DisplayMode::setOsdMouse(const char* curMode) {

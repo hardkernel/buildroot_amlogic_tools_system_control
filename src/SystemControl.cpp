@@ -57,3 +57,11 @@ void SystemControl::setTvColorFormat(const char* mode) {
 void SystemControl::setTvHdcpMode(const char* mode) {
     pDisplayMode->setSourceHdcpMode(mode);
 }
+
+void SystemControl::setZoomOut() {
+    pDisplayMode->zoomOut();
+}
+
+void SystemControl::setZoomIn() {
+    pDisplayMode->zoomIn();
+}
