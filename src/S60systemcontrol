@@ -8,6 +8,8 @@ start() {
 	source /etc/property_set.sh
 	mkdir -p /run/systemcontrol
 	/usr/bin/systemcontrol &
+    echo 0x10001 > /sys/class/graphics/fb0/free_scale_switch
+    echo -1 > /sys/module/fb/parameters/osd_logo_index
 	echo "OK"
 }
 stop() {
