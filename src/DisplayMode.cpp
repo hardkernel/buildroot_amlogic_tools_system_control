@@ -644,6 +644,9 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     }
 
     //update window_axis
+#if defined(ODROIDN2)
+    updateFreeScaleAxis();
+#endif
     updateWindowAxis(outputmode);
 
     syslog(LOG_INFO, "DisplayMode curmode:%s, outputmode:%s\n", curMode, outputmode);
@@ -783,11 +786,40 @@ bool DisplayMode::isHDCPTxAuthSuccess() {
     return success;
 }
 
+#if defined(ODROIDN2)
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+
+int fbset(int xres, int yres, int vxres, int vyres)
+{
+	struct fb_var_screeninfo var;
+
+	int fd = open("/dev/fb0", O_RDONLY);
+	if (fd < 0)
+		return -errno;
+
+	ioctl(fd, FBIOGET_VSCREENINFO, &var);
+	var.xres = xres;
+	var.yres = yres;
+	var.xres_virtual = vxres;
+	var.yres_virtual = vyres;
+	ioctl(fd, FBIOPUT_VSCREENINFO, &var);
+	close(fd);
+
+	return 0;
+}
+#endif
+
 void DisplayMode::updateFreeScaleAxis() {
     syslog(LOG_INFO, "DisplayMode:::updateFreeScaleAxis\n");
     char axis[MAX_STR_LEN] = {0};
     sprintf(axis, "%d %d %d %d",
             0, 0, mDisplayWidth - 1, mDisplayHeight - 1);
+#if defined(ODROIDN2)
+    /* FIXME: the virtual screen size is always double? */
+    fbset(mDisplayWidth, mDisplayHeight, mDisplayWidth, mDisplayHeight * 2);
+#endif
     pSysWrite->writeSysfs(DISPLAY_FB0_FREESCALE_AXIS, axis);
 }
 
