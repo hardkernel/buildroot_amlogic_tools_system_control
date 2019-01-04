@@ -17,6 +17,9 @@
 
 #define LOG_TAG "systemcontrol"
 
+#if defined(ODROIDN2)
+#include "ubootenv-odroid.c"
+#else
 static pthread_mutex_t env_lock = PTHREAD_MUTEX_INITIALIZER;
 
 char BootenvPartitionName[32] = {0,};
@@ -476,3 +479,4 @@ const char *bootenv_get(const char *key) {
 
     return env;
 }
+#endif
