@@ -251,7 +251,9 @@ private:
     bool getBootEnv(const char *key, char *value);
     void setBootEnv(const char *key, const char *value);
     int getBootenvInt(const char* key, int defaultVal);
+#if !defined(ODROIDN2)
     int parseConfigFile();
+#endif
     void getHighestHdmiMode(char* mode, hdmi_data_t* data);
     void filterHdmiMode(char * mode, hdmi_data_t* data);
     void getHdmiOutputMode(char *mode, hdmi_data_t* data);

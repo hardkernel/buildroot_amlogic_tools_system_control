@@ -84,10 +84,19 @@ int DisplayMode::getBootenvInt(const char* key, int defaultVal) {
 
 void DisplayMode::init() {
     syslog(LOG_INFO, "DisplayMode::init");
+#if !defined(ODROIDN2)
     parseConfigFile();
+#else
+    if (!getBootEnv("ubootenv.var.outputmode", mDefaultUI))
+	    strcpy(mDefaultUI, "1080p60hz");
+#endif
     pFrameRateAutoAdaption = new FrameRateAutoAdaption(this);
 
+#if !defined(ODROIDN2)
     syslog(LOG_INFO, "DisplayMode soc(%s) default UI(%s)", mSocType, mDefaultUI);
+#else
+    syslog(LOG_INFO, "DisplayMode default UI(%s)", mDefaultUI);
+#endif
 
     pTxAuth = new HDCPTxAuth();
     pTxAuth->setUEventCallback(this);
@@ -98,6 +107,7 @@ void DisplayMode::init() {
     dumpCaps();
 }
 
+#if !defined(ODROIDN2)
 int DisplayMode::parseConfigFile(){
     syslog(LOG_INFO, "DisplayMode::parseConfigFile");
     const char* WHITESPACE = " \t\r";
@@ -125,6 +135,7 @@ int DisplayMode::parseConfigFile(){
     }
     return status;
 }
+#endif
 
 void DisplayMode::onTxEvent(char *hpdState, int outputState) {
     syslog(LOG_INFO, "DisplayMode onTxEvent hpdState(%s) state(%d)\n", hpdState, outputState);
