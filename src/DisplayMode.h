@@ -279,4 +279,42 @@ private:
     HDCPTxAuth *pTxAuth = NULL;
 };
 
+#if defined(AML_OSD_USE_DRM)
+#include <stdio.h>
+
+static void DisplaySetWindowAxis(int x, int y, int w, int h) {
+    char drm_client_cmd[128] = {0};
+    snprintf(drm_client_cmd, 128, "drm-helper-client -S ui_rect %d %d %d %d", x, y, w, h);
+    system(drm_client_cmd);
+}
+
+static void DisplaySetDisplayMode(const char* mode) {
+    char drm_client_cmd[128] = {0};
+    snprintf(drm_client_cmd, 128, "drm-helper-client -S display_mode %s", mode);
+    system(drm_client_cmd);
+}
+static bool DisplayGetDisplayMode(char* mode, int len) {
+    char drm_client_cmd[128] = {0};
+    char buffer[128] = {0};
+    FILE* f;
+    bool ret = false;
+    snprintf(drm_client_cmd, 128, "drm-helper-client -G display_mode" );
+    f = popen(drm_client_cmd, "r");
+    if (f != NULL) {
+         fread(buffer, sizeof(char), 128, f);
+         if (feof(f)) {
+             char* delim = strchr(buffer, ',');
+             if (delim != NULL) {
+                 *delim = 0;
+             }
+             strncpy(mode, buffer, len);
+             ret = true;
+         }
+         fclose(f);
+    }
+    return ret;
+}
+#endif
+
+
 #endif

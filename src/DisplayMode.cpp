@@ -543,7 +543,11 @@ void DisplayMode::setSourceOutputMode(const char* outputmode, output_mode_state 
     char curMode[MODE_LEN] = {0};
     pSysWrite->readSysfs(SYSFS_DISPLAY_MODE, curMode);
     if (strstr(curMode, outputmode) == NULL) {
+#if defined(AML_OSD_USE_DRM)
+        DisplaySetDisplayMode(outputmode);
+#else
         pSysWrite->writeSysfs(SYSFS_DISPLAY_MODE, outputmode);
+#endif
     } else {
         syslog(LOG_ERR, "DisplayMode is equals to outputmode, Do not need set it\n");
     }
@@ -603,7 +607,11 @@ void DisplayMode::setRecWindowVideoAxis() {
     char axis[MAX_STR_LEN] = {0};
 
     pSysWrite->readSysfs(SYSFS_VIDEO_AXIS, axis);
+#if defined(AML_OSD_USE_DRM)
+    DisplayGetDisplayMode(currMode, MODE_LEN);
+#else
     pSysWrite->readSysfs(SYSFS_DISPLAY_MODE, currMode);
+#endif
     getBootEnv(UBOOTENV_OUTPUTMODE, oldMode);
     syslog(LOG_INFO, "DisplayMode::setRecWindowVideoAxis oldMode: %s, old video_axis: %s\n", oldMode, axis);
 
@@ -701,9 +709,13 @@ void DisplayMode::updateWindowAxis(const char* outputmode) {
     char axis[MAX_STR_LEN] = {0};
     int position[4] = { 0, 0, 0, 0 };//x,y,w,h
     getPosition(outputmode, position);
+#if defined(AML_OSD_USE_DRM)
+    DisplaySetWindowAxis(position[0], position[1], position[2], position[3]);
+#else
     sprintf(axis, "%d %d %d %d",
             position[0], position[1], position[0] + position[2] - 1, position[1] + position[3] -1);
     pSysWrite->writeSysfs(DISPLAY_FB0_WINDOW_AXIS, axis);
+#endif
 }
 
 void DisplayMode::getPosition(const char* curMode, int *position) {
